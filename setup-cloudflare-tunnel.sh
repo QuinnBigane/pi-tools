@@ -42,8 +42,9 @@ fi
 
 if ! [ -f /etc/apt/sources.list.d/cloudflared.list ]; then
   echo "Adding Cloudflare APT repo..."
-  echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" \
-    | sudo tee /etc/apt/sources.list.d/cloudflared.list >/dev/null
+  echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' \
+  | sudo tee /etc/apt/sources.list.d/cloudflared.list >/dev/null
+
 fi
 
 sudo apt-get update
