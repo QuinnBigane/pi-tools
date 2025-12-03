@@ -9,13 +9,14 @@ set -euo pipefail
 #     • Creates /boot/wpa_supplicant.conf     #
 #     • Forces Pi to read WiFi from /boot     #
 #     • Hardens ext4 journaling               #
-#     • Enables watchdog                      #
+#     • Enables hardware watchdog             #
+#     • Enables watchdog service              #
 #     • Enables SSH                           #
 #                                             #
 #  WHEN TO RUN:                               #
 #     • After flashing OS                     #
 #     • After major OS upgrade                #
-#     • (Not needed every boot)               # 
+#     • (Not needed every boot)               #
 ###############################################
 
 echo "=========================================="
@@ -26,7 +27,8 @@ echo "This script will:"
 echo "  ✓ Set WiFi credentials"
 echo "  ✓ Move WiFi config to /boot"
 echo "  ✓ Harden filesystem against corruption"
-echo "  ✓ Enable SSH + watchdog"
+echo "  ✓ Enable hardware + software watchdog"
+echo "  ✓ Enable SSH"
 echo ""
 read -rp "Press ENTER to continue..."
 
@@ -109,13 +111,44 @@ echo "[*] Enabling SSH on boot..."
 sudo touch /boot/ssh
 
 #############################################
-# Install & enable watchdog
+# Enable hardware watchdog
 #############################################
-echo "[*] Installing watchdog (auto-reboot on kernel hang)..."
+echo "[*] Enabling hardware watchdog in /boot/config.txt..."
+
+CONF=/boot/config.txt
+if grep -q "^dtparam=watchdog=on" "$CONF"; then
+    echo "    Hardware watchdog already enabled."
+else
+    echo "dtparam=watchdog=on" | sudo tee -a "$CONF" >/dev/null
+    echo "    Added dtparam=watchdog=on to config.txt."
+fi
+
+echo "[*] Loading bcm2835_wdt watchdog module for this boot..."
+if sudo modprobe bcm2835_wdt 2>/dev/null; then
+    echo "    bcm2835_wdt module loaded."
+else
+    echo "    Warning: bcm2835_wdt module could not load (may require reboot)."
+fi
+
+echo "[*] Checking for /dev/watchdog..."
+if ls /dev/watchdog* >/dev/null 2>&1; then
+    ls -l /dev/watchdog*
+else
+    echo "    Warning: /dev/watchdog not present yet. A reboot may be required."
+fi
+
+#############################################
+# Install & enable watchdog service
+#############################################
+echo "[*] Installing watchdog daemon..."
 sudo apt-get update -y
 sudo apt-get install -y watchdog
+
+echo "[*] Enabling watchdog service..."
 sudo systemctl enable watchdog
-sudo systemctl restart watchdog
+
+echo "[*] Starting watchdog service..."
+sudo systemctl restart watchdog || echo "    (service will work after reboot if hardware was just enabled)"
 
 #############################################
 # Finished
